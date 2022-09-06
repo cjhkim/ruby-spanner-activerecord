@@ -14,7 +14,11 @@ module ActiveRecord
           return "PENDING_COMMIT_TIMESTAMP()" if value == :commit_timestamp && options.length && options[0] == :dml
           return "spanner.commit_timestamp()" if value == :commit_timestamp && options.length && options[0] == :mutation
           val = super value
-          val.acts_like?(:time) ? val.utc.rfc3339(9) : val
+          if ActiveRecord::VERSION::MAJOR < 6
+            val.acts_like?(:time) ? val.utc : val
+          else
+            val.acts_like?(:time) ? val.utc.rfc3339(9) : val
+          end
         end
 
         def user_input_in_time_zone value

@@ -89,12 +89,12 @@ module Arel # :nodoc: all
       end
 
       def visit_Arel_Table o, collector
-        return super unless collector.table_hints[o.name]
+        # return super unless collector.table_hints[o.name]
         if o.table_alias
           collector << quote_table_name(o.name) << collector.table_hints[o.name] \
                     << " " << quote_table_name(o.table_alias)
         else
-          collector << quote_table_name(o.name) << collector.table_hints[o.name]
+          collector << quote_table_name(o.name) #<< collector.table_hints[o.name]
         end
       end
 
@@ -109,11 +109,22 @@ module Arel # :nodoc: all
 
       # For ActiveRecord 6.x
       def visit_Arel_Nodes_BindParam o, collector
-        # Do not generate a query parameter if the value should be set to the PENDING_COMMIT_TIMESTAMP(), as that is
-        # not supported as a parameter value by Cloud Spanner.
-        return collector << "PENDING_COMMIT_TIMESTAMP()" \
-          if o.value.type.is_a?(ActiveRecord::Type::Spanner::Time) && o.value.value == :commit_timestamp
-        collector.add_bind(o.value, &bind_block)
+        if ActiveRecord::VERSION::MAJOR < 6
+          if @block
+            val = @block.call
+            if String === val
+              collector << val
+            end
+          else
+            collector.add_bind(o, &bind_block)
+          end
+        else
+          # Do not generate a query parameter if the value should be set to the PENDING_COMMIT_TIMESTAMP(), as that is
+          # not supported as a parameter value by Cloud Spanner.
+          return collector << "PENDING_COMMIT_TIMESTAMP()" \
+            if o.value.type.is_a?(ActiveRecord::Type::Spanner::Time) && o.value.value == :commit_timestamp
+          collector.add_bind(o.value, &bind_block)
+        end
       end
       # rubocop:enable Naming/MethodName
     end

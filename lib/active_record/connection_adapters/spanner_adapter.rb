@@ -74,9 +74,28 @@ module ActiveRecord
       include Spanner::DatabaseStatements
       include Spanner::SchemaStatements
 
+      if ActiveRecord::VERSION::MAJOR < 6
+        def self.quoted_column_names # :nodoc:
+          @quoted_column_names ||= {}
+        end
+
+        def self.quoted_table_names # :nodoc:
+          @quoted_table_names ||= {}
+        end
+
+        def schema_cache=(cache)
+          cache.connection = self
+          @schema_cache = cache
+        end
+      end
+
       def initialize connection, logger, connection_options, config
         super connection, logger, config
         @connection_options = connection_options
+
+        if ActiveRecord::VERSION::MAJOR < 6
+          @schema_cache = SpannerSchemaCache.new self
+        end
       end
 
       def max_identifier_length
@@ -248,17 +267,33 @@ module ActiveRecord
         include TypeMapBuilder
       end
 
-      def translate_exception exception, message:, sql:, binds:
-        if exception.is_a? Google::Cloud::FailedPreconditionError
-          case exception.message
-          when /.*does not specify a non-null value for these NOT NULL columns.*/,
-               /.*must not be NULL.*/
-            NotNullViolation.new message, sql: sql, binds: binds
+      if ActiveRecord::VERSION::MAJOR < 6
+        def translate_exception exception, message
+          if exception.is_a? Google::Cloud::FailedPreconditionError
+            case exception.message
+            when /.*does not specify a non-null value for these NOT NULL columns.*/,
+                /.*must not be NULL.*/
+              NotNullViolation.new message
+            else
+              super
+            end
           else
             super
           end
-        else
-          super
+        end
+      else
+        def translate_exception exception, message:, sql:, binds:
+          if exception.is_a? Google::Cloud::FailedPreconditionError
+            case exception.message
+            when /.*does not specify a non-null value for these NOT NULL columns.*/,
+                /.*must not be NULL.*/
+                NotNullViolation.new message, sql: sql, binds: binds
+            else
+              super
+            end
+          else
+            super
+          end
         end
       end
     end

@@ -25,6 +25,12 @@ module ActiveRecord
         def primary_and_parent_key= value
           @primary_and_parent_key = value
         end
+
+        if ActiveRecord::VERSION::MAJOR < 6
+          def base_class?
+            base_class == self
+          end
+        end
       end
     end
   end

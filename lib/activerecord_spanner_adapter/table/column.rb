@@ -41,6 +41,12 @@ module ActiveRecordSpannerAdapter
         type
       end
 
+      if ActiveRecord::VERSION::MAJOR < 6
+        def sql_type
+          spanner_type
+        end
+      end
+
       def options
         {
           limit: limit,

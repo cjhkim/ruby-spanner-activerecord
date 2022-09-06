@@ -6,8 +6,10 @@
 
 # frozen_string_literal: true
 
-require "active_record/connection_adapters/spanner/schema_creation"
-require "active_record/connection_adapters/spanner/schema_dumper"
+if ActiveRecord::VERSION::MAJOR >= 6
+  require "active_record/connection_adapters/spanner/schema_creation"
+  require "active_record/connection_adapters/spanner/schema_dumper"
+end
 
 module ActiveRecord
   module ConnectionAdapters
@@ -105,6 +107,12 @@ module ActiveRecord
 
         def column_definitions table_name
           information_schema { |i| i.table_columns table_name }
+        end
+
+        if ActiveRecord::VERSION::MAJOR < 6
+          def columns table_name
+            column_definitions table_name
+          end
         end
 
         def new_column_from_field _table_name, field

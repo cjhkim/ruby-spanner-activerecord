@@ -12,13 +12,32 @@ module ActiveRecord
       module DatabaseStatements
         # DDL, DML and DQL Statements
 
+        if ActiveRecord::VERSION::MAJOR < 6
+          def materialize_transactions
+            return if @materializing_transactions
+            return unless @has_unmaterialized_transactions
+
+            @connection.lock.synchronize do
+              begin
+                @materializing_transactions = true
+                @stack.each { |t| t.materialize! unless t.materialized? }
+              ensure
+                @materializing_transactions = false
+              end
+              @has_unmaterialized_transactions = false
+            end
+          end
+        end
+
         def execute sql, name = nil, binds = []
           statement_type = sql_statement_type sql
 
-          if preventing_writes? && [:dml, :ddl].include?(statement_type)
-            raise ActiveRecord::ReadOnlyError(
-              "Write query attempted while in readonly mode: #{sql}"
-            )
+          if ActiveRecord::VERSION::MAJOR > 5
+            if preventing_writes? && [:dml, :ddl].include?(statement_type)
+              raise ActiveRecord::ReadOnlyError(
+                "Write query attempted while in readonly mode: #{sql}"
+              )
+            end
           end
 
           if statement_type == :ddl
